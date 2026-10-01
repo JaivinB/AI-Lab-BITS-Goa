@@ -1,0 +1,135 @@
+
+######################################################################
+# TEST A - solvable problem (the original warehouse)
+######################################################################
+
+======================================================================
+Warehouse: deliver the package from a to c
+======================================================================
+Initial state : {At(Package,a), At(Robot,a)}
+Goal          : {At(Package,c)}
+Actions        : 10 available
+Plan found    : yes, 4 actions (states expanded: 8)
+
+Plan and the state after every action:
+  S0            {At(Package,a), At(Robot,a)}
+  PickUp(Package,a) {At(Robot,a), Holding(Package)}
+  Move(a,b)     {At(Robot,b), Holding(Package)}
+  Move(b,c)     {At(Robot,c), Holding(Package)}
+  Drop(Package,c) {At(Package,c), At(Robot,c)}
+
+Independent replay of the plan:
+  every precondition satisfied in the state where the action
+  executes, and the final state entails the goal -> plan valid
+
+Expected 4 actions; found 4.
+Every action in the returned plan was verified individually by
+replaying the plan and checking its preconditions against the state
+in which it actually executes.
+
+
+######################################################################
+# TEST B - impossible problem (the PickUp action removed)
+######################################################################
+
+Without PickUp the package can never leave a, so no plan exists.
+The planner must say so rather than inventing an action.
+
+Remaining actions: ['Move(a,b)', 'Move(b,a)', 'Move(b,c)', 'Move(c,b)', 'Drop(Package,a)', 'Drop(Package,b)', 'Drop(Package,c)']
+
+======================================================================
+Warehouse without PickUp
+======================================================================
+Initial state : {At(Package,a), At(Robot,a)}
+Goal          : {At(Package,c)}
+Actions        : 7 available
+Plan found    : NO - no plan found (states expanded: 3)
+
+The planner reports failure rather than inventing an action.
+
+Reported no plan: True
+
+Note what makes this termination sound rather than lucky: the
+reachable state space is finite and already-visited states are never
+re-expanded, so breadth-first search exhausts it and stops.  A
+planner that re-expanded states would loop here for ever, moving the
+robot a -> b -> a -> b without ever failing.
+
+
+######################################################################
+# TEST C - irrelevant actions (the robot reaching c is not the goal)
+######################################################################
+
+The Move actions change the robot's location and nothing else.  The
+goal is At(Package,c), not At(Robot,c).  Three separate checks:
+
+1. Goal test applied directly to a state where the robot is at c
+   but the package is still at a:
+     state {At(Package,a), At(Robot,c)}
+     goal  {At(Package,c)}
+     satisfies(state, goal) = False   <- must be False
+
+2a. Add a Patrol action that sends the robot from a straight to c,
+    but only when it is NOT holding the package - so it can never
+    help deliver anything.  This is the irrelevant action proper,
+    and it is also the only test of a negative precondition:
+      applicable in the initial state: True
+      plan: ['PickUp(Package,a)', 'Move(a,b)', 'Move(b,c)', 'Drop(Package,c)']
+      length 4 (states expanded 8)
+      Patrol used: False   <- must be False
+      The plan is unchanged at 4 actions.  Patrol is applicable in
+      the initial state and does put the robot at c, but its
+      negative precondition means it can never be combined with
+      carrying the package, so it contributes nothing to the goal.
+
+2b. For contrast, a Teleport action identical to Patrol but without
+    the negative precondition - so it carries a held package:
+      plan: ['PickUp(Package,a)', 'Teleport(Robot,c)', 'Drop(Package,c)']
+      length 3 (states expanded 8)
+      The plan shortens to 3, and Teleport appears only between
+      PickUp and Drop.  The goal is still reached through the
+      package's own location, never through the robot's arrival:
+      the state after Teleport is
+        {At(Robot,c), Holding(Package)}
+      which does NOT entail At(Package,c); Drop is still required.
+
+3. Remove PickUp and Drop entirely, leaving only Move.  The robot
+   can still reach c, so if the planner confused At(Robot,c) with
+   At(Package,c) it would report success here:
+     plan found: None (states expanded 3)   <- must be None
+     the robot does reach c in the explored space, e.g. via
+     Move(a,b) then Move(b,c), yet no plan is reported.
+
+
+######################################################################
+# TASK 5 - generated explanation vs independent verification
+######################################################################
+
+The laboratory sheet suggests reasoning about the sequence
+
+    Move(a,b),  PickUp(Package,b),  Move(b,c),  Drop(Package,c)
+
+It reads perfectly plausibly: go to b, pick the package up, carry it
+to c, put it down.  An LLM asked to justify it can produce a fluent
+explanation of exactly that story.  Replaying it against the actual
+preconditions:
+
+    step 2: PickUp(Package,b) not applicable - missing ['At(Package,b)'], forbidden present []
+    final state {At(Package,a), At(Robot,b)} does not entail the goal {At(Package,c)}
+
+Step 2 fails: PickUp(Package,b) requires At(Package,b), and the
+package never moved - it is still at a, because Move affects only
+the robot's location.  The sequence is invalid, and no amount of
+fluency in the explanation changes that.
+
+The correct plan picks the package up BEFORE moving:
+    PickUp(Package,a), Move(a,b), Move(b,c), Drop(Package,c)
+    problems: none - plan valid
+    final state: {At(Package,c), At(Robot,c)}
+
+Which to trust: the independently executed state transitions.  The
+explanation and the plan come from the same source, so an error in
+the plan tends to be reproduced in the explanation - the two agree
+with each other rather than with the domain.  The replay consults
+the action definitions instead, and is capable of disagreeing.
+

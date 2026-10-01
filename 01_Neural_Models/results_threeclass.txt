@@ -1,0 +1,91 @@
+torch 2.14.1 | seed 0 | steps 5000 | optimiser Adam(lr=0.05)
+
+======================================================================
+PREDICTION 1 and 2 - shapes of the new output layer
+======================================================================
+W2 shape            : (3, 2)   (predicted (3, 2))
+b2 shape            : (3,)      (predicted (3,))
+logit tensor shape  : (4, 3)   (4 examples x 3 logits)
+logits per example  : 3      (predicted 3)
+
+======================================================================
+TRAINING
+======================================================================
+Initial loss : 1.059108   (ln 3 = 1.098612 if the model were uninformative)
+Final loss   : 1.090759e-05
+
+======================================================================
+RESULTS - predicted class probabilities for all four inputs
+======================================================================
+ x1  x2   target        P(class 0)  P(class 1)  P(class 2)   predicted
+  0   0      0         0.999986    0.000014    0.000000        0
+  0   1      1         0.000007    0.999991    0.000002        1
+  1   0      1         0.000007    0.999992    0.000002        1
+  1   1      2         0.000000    0.000013    0.999987        2
+
+Correct: 4/4   ->   PASS
+  (0,0) -> class 0 (both inactive)
+  (0,1) -> class 1 (sensors disagree)
+  (1,0) -> class 1 (sensors disagree)
+  (1,1) -> class 2 (both active)
+
+======================================================================
+PREDICTION 3 - a softmax vector sums to one
+======================================================================
+Input (0,1), softmax probability vector:
+  [6.6342e-06, 0.9999914169, 1.9422e-06]
+  sum = 1.0000000000
+  |sum - 1| = 0.000e+00
+
+Row sums for all four examples: [0.9999999404, 1.0, 1.0, 0.9999999404]
+
+======================================================================
+PREDICTION 4 - the logit gradient equals (p - y) / N
+======================================================================
+autograd dL/dz:
+tensor([[-3.4869e-06,  3.4778e-06,  4.6357e-10],
+        [ 1.6586e-06, -2.1458e-06,  4.8555e-07],
+        [ 1.6412e-06, -2.0862e-06,  4.5805e-07],
+        [ 1.7961e-08,  3.1560e-06, -3.1888e-06]])
+
+(p - y) / 4 computed by hand:
+tensor([[-3.4869e-06,  3.4778e-06,  4.6357e-10],
+        [ 1.6586e-06, -2.1458e-06,  4.8555e-07],
+        [ 1.6412e-06, -2.0862e-06,  4.5805e-07],
+        [ 1.7961e-08,  3.1560e-06, -3.1888e-06]])
+
+max |autograd - (p - y)/4| = 1.364e-12
+-> the closed-form softmax/cross-entropy logit gradient is confirmed.
+   The division by 4 is only the mean reduction over the batch.
+
+======================================================================
+OPTIONAL DIAGNOSTIC - adding a constant to every logit
+======================================================================
+max |softmax(z) - softmax(z + 100)| = 5.275e-11
+
+The probabilities are unchanged apart from floating-point roundoff,
+because exp(z_k + c) / sum_j exp(z_j + c) cancels the factor exp(c)
+in the numerator and the denominator.
+
+A naive implementation nonetheless breaks, because exp() of a large
+logit overflows before the cancellation can happen:
+  naive exp(z)/sum(exp(z)) on z = [1000.0, 1001.0, 1002.0]  ->  [nan, nan, nan]
+  torch.softmax on the same z                      ->  [0.090031, 0.244728, 0.665241]
+
+Stable implementations subtract max_j z_j first.  That shift leaves
+the result mathematically identical, by the cancellation above, but
+makes the largest exponent exp(0) = 1, so nothing overflows.
+
+======================================================================
+SCALING REMARK (Task 5 'Think About It')
+======================================================================
+Treating next-token prediction as classification over a vocabulary
+leaves the following unchanged as the number of classes grows from 3
+to tens of thousands: the softmax normalisation, the cross-entropy
+loss, and the gradient p - y.  What changes is everything around it -
+the output matrix becomes (vocabulary x hidden) and dominates the
+parameter count, the normalising sum over classes becomes the
+expensive part of each step, the targets become sparse one-hot rows
+stored as indices, and the context is no longer two binary inputs but
+a long sequence requiring an architecture that can represent it.
+

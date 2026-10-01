@@ -1,0 +1,6 @@
+# Lab 1 (Neural Models) is the only lab with a dependency.
+# Labs 2-5 use the Python 3 standard library only.
+torch>=2.0
+
+# Optional, for the Lab 4 extension (Prolog as an independent plan verifier):
+#   SWI-Prolog, installed separately -- https://www.swi-prolog.org

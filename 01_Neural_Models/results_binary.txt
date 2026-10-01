@@ -1,0 +1,167 @@
+torch 2.14.1 | seed 0 | steps 5000 | optimiser Adam(lr=0.05)
+
+======================================================================
+PART A - basic learning check (hidden activation: tanh, random init)
+======================================================================
+Initial loss : 0.715159
+Final loss   : 2.378083e-05
+
+ x1  x2  target   probability   predicted
+  0   0     0       0.000017        0
+  0   1     1       0.999971        1
+  1   0     1       0.999965        1
+  1   1     0       0.000014        0
+
+Correct: 4/4   ->   PASS
+
+======================================================================
+PART B - backpropagation check
+======================================================================
+Loss on the untrained network: 0.715159
+
+model[0].weight.grad  =  dL/dW1   (shape (2, 2)):
+tensor([[ 0.0005,  0.0006],
+        [-0.0426, -0.0448]])
+
+Entry [j][i] is the partial derivative of the scalar loss with
+respect to the weight joining input i to hidden unit j.  It is the
+quantity the optimiser subtracts (scaled) from that weight.
+
+Mean of the four example-wise dL/dW1 tensors:
+tensor([[ 0.0005,  0.0006],
+        [-0.0426, -0.0448]])
+
+max |batch gradient - mean of example gradients| = 0.000e+00
+-> the mean loss differentiates to the mean of the example gradients,
+   because differentiation is linear and L = (1/4) * sum_n L_n.
+
+Finite-difference check of autograd on W1
+(central differences, h=1e-6, float64 to control rounding):
+  W1[0][0]: autograd  0.000505399   finite-diff  0.000505399   |diff| 5.37e-11
+  W1[0][1]: autograd  0.000606949   finite-diff  0.000606949   |diff| 2.99e-12
+  W1[1][0]: autograd -0.042569033   finite-diff -0.042569033   |diff| 1.04e-11
+  W1[1][1]: autograd -0.044772913   finite-diff -0.044772913   |diff| 2.10e-11
+  worst disagreement: 5.37e-11  ->  autograd agrees with the numerical derivative
+
+======================================================================
+PART C - symmetry experiment
+======================================================================
+
+----------------------------------------------------------------------
+C1: every weight and bias set to zero (as the lab specifies)
+----------------------------------------------------------------------
+First-layer weight matrix over the first five steps:
+  step 0:  row0 = [0.0, 0.0]
+           row1 = [0.0, 0.0]
+  step 1:  row0 = [0.0, 0.0]
+           row1 = [0.0, 0.0]
+  step 2:  row0 = [0.0, 0.0]
+           row1 = [0.0, 0.0]
+  step 3:  row0 = [0.0, 0.0]
+           row1 = [0.0, 0.0]
+  step 4:  row0 = [0.0, 0.0]
+           row1 = [0.0, 0.0]
+
+After 5000 steps:
+  row0 = [0.0, 0.0]
+  row1 = [0.0, 0.0]
+  rows still identical: True
+
+Final loss   : 0.693147
+Probabilities: [0.5, 0.5, 0.5, 0.5]
+Predicted    : [1, 1, 1, 1]   (targets [0, 1, 1, 0])
+Correct      : 2/4
+
+The two rows stay identical - in fact both stay exactly zero.  With
+W2 = 0 the signal reaching the hidden layer is zero, so dL/dW1 = 0 and
+the hidden layer never moves at all.  Only the output bias can learn,
+and the best a constant output can do on a balanced XOR table is
+p = 0.5 everywhere, i.e. loss ln 2 = 0.693147.
+
+----------------------------------------------------------------------
+C2: the two hidden units initialised identically but NOT to zero
+----------------------------------------------------------------------
+First-layer weight matrix over the first five steps:
+  step 0:  row0 = [-0.005294, 0.379323]
+           row1 = [-0.005294, 0.379323]
+  step 1:  row0 = [0.044649, 0.329327]
+           row1 = [0.044649, 0.329327]
+  step 2:  row0 = [0.082367, 0.27952]
+           row1 = [0.082367, 0.27952]
+  step 3:  row0 = [0.12404, 0.287942]
+           row1 = [0.12404, 0.287942]
+  step 4:  row0 = [0.166789, 0.305036]
+           row1 = [0.166789, 0.305036]
+
+After 5000 steps:
+  row0 = [6.717868, 6.719142]
+  row1 = [6.717868, 6.719142]
+  rows still identical: True
+
+Final loss   : 0.477402
+Probabilities: [0.666685, 0.666667, 0.666667, 1e-05]
+Predicted    : [1, 1, 1, 0]   (targets [0, 1, 1, 0])
+Correct      : 3/4
+
+Here the gradients are nonzero, yet the two rows remain identical at
+every step.  Identical hidden units compute the same output, so they
+receive the same upstream derivative and are updated by the same
+amount for ever.  The 2-2-1 network therefore behaves as a 1-hidden-
+unit network, whose decision boundary is a single line - and one line
+cannot separate XOR.  This is the symmetry problem proper; C1 is the
+degenerate special case in which the gradient also vanishes.
+Random initialisation is what breaks the symmetry.
+
+======================================================================
+PART D - activation experiment (identical seed, only the hidden activation changes)
+======================================================================
+activation     final loss  4/4 correct?     early ||dL/dW1||_2
+--------------------------------------------------------------
+sigmoid         4.774e-01      no (3/4)               0.001227
+tanh            2.378e-05           yes               0.009383
+relu            6.931e-01      no (2/4)               0.000000
+
+  sigmoid  probabilities: [0.0, 0.6667, 0.6667, 0.6667]
+  tanh     probabilities: [0.0, 1.0, 1.0, 0.0]
+  relu     probabilities: [0.4994, 0.4994, 0.4994, 0.4994]
+
+Saturation diagnostic at step 10 - hidden pre-activations z and f'(z):
+  sigmoid:
+    z      (4 examples x 2 units) = [[-0.373, 0.2568], [-0.1658, 0.1871], [-0.5319, 0.1238], [-0.3247, 0.0541]]
+    f'(z)                          = [[0.2415, 0.2459], [0.2483, 0.2478], [0.2331, 0.249], [0.2435, 0.2498]]
+    mean f'(z) = 0.244881   fraction with f'(z) exactly 0 = 0.00
+  tanh:
+    z      (4 examples x 2 units) = [[-0.5179, 0.5285], [-0.2399, 0.339], [-0.7921, 0.2932], [-0.5141, 0.1038]]
+    f'(z)                          = [[0.7733, 0.7655], [0.9446, 0.8933], [0.5649, 0.9187], [0.7761, 0.9893]]
+    mean f'(z) = 0.828233   fraction with f'(z) exactly 0 = 0.00
+  relu:
+    z      (4 examples x 2 units) = [[-0.3916, -0.1908], [-0.1315, -0.7112], [-0.456, -0.7728], [-0.1959, -1.2932]]
+    f'(z)                          = [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
+    mean f'(z) = 0.000000   fraction with f'(z) exactly 0 = 1.00
+
+  Sigmoid: f'(z) is small but strictly positive everywhere - the unit
+  is saturating, and gradient still flows, only slowly.
+  ReLU:    f'(z) is exactly 0 wherever z <= 0 - those units are dead
+  and no gradient flows through them at all.  The two mechanisms are
+  distinguishable precisely by looking at the pre-activations.
+
+The gradient norm is measured at step 10, i.e. before the loss has
+collapsed, so it reflects the activation's derivative rather than
+proximity to the optimum.
+
+======================================================================
+PART D (continued) - repeated runs over 5 seeds
+======================================================================
+Task 2 listed 'repeated-run behaviour' as a validation check, and a
+single seed cannot separate the activation from the draw of initial
+weights.  Same architecture, same optimiser, seeds [0, 1, 2, 3, 4].
+
+activation     solved 4/4  median final loss  best final loss
+-------------------------------------------------------------
+sigmoid               4/5          7.720e-05        7.361e-05
+tanh                  4/5          3.160e-05        2.378e-05
+relu                  1/5          6.931e-01        8.867e-06
+
+Read this as a statement about this 4-point problem with 2 hidden
+units and this optimiser budget - not as a ranking of activations.
+

@@ -1,0 +1,262 @@
+Lab 5 - Bayesian networks and autoregressive language models
+Corpus: 6 sentences, no ML library, counting only.
+
+======================================================================
+PART IV - FIRST-ORDER CPT  P(Xt | X_{t-1})
+======================================================================
+P(next | the)   [12 observed transitions]
+    cat        3/12  = 0.2500
+    dog        3/12  = 0.2500
+    mat        2/12  = 0.1667
+    park       2/12  = 0.1667
+    rug        2/12  = 0.1667
+    zero-probability successors (6): ['<END>', 'on', 'ran', 'sat', 'the', 'to']
+
+P(next | cat)   [3 observed transitions]
+    sat        2/3   = 0.6667
+    ran        1/3   = 0.3333
+    zero-probability successors (9): ['<END>', 'cat', 'dog', 'mat', 'on', 'park', 'rug', 'the', 'to']
+
+P(next | dog)   [3 observed transitions]
+    sat        2/3   = 0.6667
+    ran        1/3   = 0.3333
+    zero-probability successors (9): ['<END>', 'cat', 'dog', 'mat', 'on', 'park', 'rug', 'the', 'to']
+
+P(next | sat)   [4 observed transitions]
+    on         4/4   = 1.0000
+    zero-probability successors (10): ['<END>', 'cat', 'dog', 'mat', 'park', 'ran', 'rug', 'sat', 'the', 'to']
+
+P(next | ran)   [2 observed transitions]
+    to         2/2   = 1.0000
+    zero-probability successors (10): ['<END>', 'cat', 'dog', 'mat', 'on', 'park', 'ran', 'rug', 'sat', 'the']
+
+P(next | <START>)   [6 observed transitions]
+    the        6/6   = 1.0000
+    zero-probability successors (10): ['<END>', 'cat', 'dog', 'mat', 'on', 'park', 'ran', 'rug', 'sat', 'to']
+
+
+======================================================================
+PART VII - TESTING THE PROBABILISTIC SPECIFICATION
+======================================================================
+First-order model - sum_v P(v | context) for every observed context:
+  <START>                      1.0000000000
+  cat                          1.0000000000
+  dog                          1.0000000000
+  mat                          1.0000000000
+  on                           1.0000000000
+  park                         1.0000000000
+  ran                          1.0000000000
+  rug                          1.0000000000
+  sat                          1.0000000000
+  the                          1.0000000000
+  to                           1.0000000000
+  worst deviation from 1.0: 0.000e+00  ->  PASS
+
+Second-order model - sum_v P(v | context) for every observed context:
+  <START> <START>              1.0000000000
+  <START> the                  1.0000000000
+  cat ran                      1.0000000000
+  cat sat                      1.0000000000
+  dog ran                      1.0000000000
+  dog sat                      1.0000000000
+  on the                       1.0000000000
+  ran to                       1.0000000000
+  sat on                       1.0000000000
+  the cat                      1.0000000000
+  the dog                      1.0000000000
+  the mat                      1.0000000000
+  the park                     1.0000000000
+  the rug                      1.0000000000
+  to the                       1.0000000000
+  worst deviation from 1.0: 0.000e+00  ->  PASS
+
+The chain rule evaluated on a training sentence, as a second check
+that the factors are the ones the Bayesian network specifies:
+  P(the | <START>)       = 1.0000
+  P(cat | the)           = 0.2500
+  P(sat | cat)           = 0.6667
+  P(on | sat)            = 1.0000
+  P(the | on)            = 1.0000
+  P(mat | the)           = 0.1667
+  P(<END> | mat)         = 1.0000
+  product = 0.027778
+
+
+======================================================================
+PART VIII - NEXT-WORD PREDICTION, FIRST-ORDER MODEL
+======================================================================
+context        argmax       P        full distribution
+----------------------------------------------------------------------
+the            cat (tie: cat, dog) 0.250    cat 0.250, dog 0.250, mat 0.167, park 0.167, rug 0.167
+cat            sat          0.667    sat 0.667, ran 0.333
+dog            sat          0.667    sat 0.667, ran 0.333
+sat            on           1.000    on 1.000
+ran            to           1.000    to 1.000
+on             the          1.000    the 1.000
+to             the          1.000    the 1.000
+
+
+======================================================================
+PARTS IX AND X - GENERATION, FIRST-ORDER MODEL
+======================================================================
+Mode A - greedy: always argmax P(w | context)
+  1. the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat
+  2. the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat
+  3. the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat
+  4. the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat
+  5. the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat sat on the cat
+  distinct sentences: 1 of 5
+  hit the length cap: 5 of 5
+
+Mode B - sampling: draw w ~ P(w | context)
+  1. the rug
+  2. the dog sat on the cat ran to the park
+  3. the park
+  4. the rug
+  5. the mat
+  distinct sentences: 4 of 5
+  hit the length cap: 0 of 5
+
+Twenty sampled sentences (Part IX):
+   1. the cat sat on the mat
+   2. the dog sat on the cat ran to the dog sat on the dog ran to the cat sat on the rug
+   3. the dog sat on the dog sat on the park
+   4. the cat ran to the cat sat on the mat
+   5. the rug
+   6. the park
+   7. the cat ran to the rug
+   8. the park
+   9. the park
+  10. the park
+  11. the dog sat on the rug
+  12. the mat
+  13. the cat ran to the rug
+  14. the cat sat on the cat sat on the mat
+  15. the mat
+  16. the dog sat on the dog sat on the rug
+  17. the cat ran to the dog sat on the park
+  18. the mat
+  19. the mat
+  20. the park
+  distinct sentences: 12 of 20
+  hit the length cap: 0 of 20
+  sentences that appear verbatim in the training corpus: 2 of 20
+
+
+======================================================================
+PART XI - SECOND-ORDER CPT  P(Xt | X_{t-2}, X_{t-1})
+======================================================================
+P(next | <START> <START>)   [6 observed transitions]
+    the        6/6   = 1.0000
+    zero-probability successors (10): ['<END>', 'cat', 'dog', 'mat', 'on', 'park', 'ran', 'rug', 'sat', 'to']
+
+P(next | <START> the)   [6 observed transitions]
+    cat        3/6   = 0.5000
+    dog        3/6   = 0.5000
+    zero-probability successors (9): ['<END>', 'mat', 'on', 'park', 'ran', 'rug', 'sat', 'the', 'to']
+
+P(next | the cat)   [3 observed transitions]
+    sat        2/3   = 0.6667
+    ran        1/3   = 0.3333
+    zero-probability successors (9): ['<END>', 'cat', 'dog', 'mat', 'on', 'park', 'rug', 'the', 'to']
+
+P(next | cat sat)   [2 observed transitions]
+    on         2/2   = 1.0000
+    zero-probability successors (10): ['<END>', 'cat', 'dog', 'mat', 'park', 'ran', 'rug', 'sat', 'the', 'to']
+
+P(next | on the)   [4 observed transitions]
+    mat        2/4   = 0.5000
+    rug        2/4   = 0.5000
+    zero-probability successors (9): ['<END>', 'cat', 'dog', 'on', 'park', 'ran', 'sat', 'the', 'to']
+
+P(next | the mat)   [2 observed transitions]
+    <END>      2/2   = 1.0000
+    zero-probability successors (10): ['cat', 'dog', 'mat', 'on', 'park', 'ran', 'rug', 'sat', 'the', 'to']
+
+
+======================================================================
+SECOND-ORDER NEXT-WORD PREDICTION
+======================================================================
+context        argmax       P        full distribution
+----------------------------------------------------------------------
+<START> the    cat (tie: cat, dog) 0.500    cat 0.500, dog 0.500
+the cat        sat          0.667    sat 0.667, ran 0.333
+the dog        sat          0.667    sat 0.667, ran 0.333
+cat sat        on           1.000    on 1.000
+cat ran        to           1.000    to 1.000
+on the         mat (tie: mat, rug) 0.500    mat 0.500, rug 0.500
+the park       <END>        1.000    <END> 1.000
+
+
+======================================================================
+GENERATION, SECOND-ORDER MODEL
+======================================================================
+Mode A - greedy: always argmax P(w | context)
+  1. the cat sat on the mat
+  2. the cat sat on the mat
+  3. the cat sat on the mat
+  4. the cat sat on the mat
+  5. the cat sat on the mat
+  distinct sentences: 1 of 5
+  hit the length cap: 0 of 5
+
+Mode B - sampling: draw w ~ P(w | context)
+  1. the dog sat on the mat
+  2. the cat ran to the park
+  3. the dog ran to the park
+  4. the dog sat on the mat
+  5. the cat ran to the park
+  distinct sentences: 3 of 5
+  hit the length cap: 0 of 5
+
+Twenty sampled sentences (Part IX):
+   1. the cat sat on the rug
+   2. the cat sat on the mat
+   3. the dog sat on the rug
+   4. the cat ran to the park
+   5. the cat sat on the rug
+   6. the dog sat on the mat
+   7. the cat ran to the park
+   8. the dog sat on the mat
+   9. the dog ran to the park
+  10. the dog ran to the park
+  11. the cat sat on the mat
+  12. the dog sat on the rug
+  13. the cat ran to the park
+  14. the cat sat on the mat
+  15. the cat sat on the rug
+  16. the cat sat on the mat
+  17. the dog sat on the mat
+  18. the cat sat on the rug
+  19. the cat sat on the rug
+  20. the dog ran to the park
+  distinct sentences: 6 of 20
+  hit the length cap: 0 of 20
+  sentences that appear verbatim in the training corpus: 20 of 20
+
+
+======================================================================
+PART XIII - COMPARING THE FIRST- AND SECOND-ORDER MODELS
+======================================================================
+Measure                                 order 1      order 2
+------------------------------------------------------------
+vocabulary |V|                               11           11
+contexts observed                            11           15
+context alphabet size                        11           11
+contexts possible (alphabet^order)           11          121
+contexts with no distribution                 0          106
+non-zero CPT entries stored                  17           19
+free parameters estimated                     6            4
+full CPT size (contexts x |V|)              121         1331
+
+order 1: 12 distinct of 20 generated, 2 verbatim from the corpus
+order 2: 6 distinct of 20 generated, 20 verbatim from the corpus
+
+Sequence probability under each model, by the chain rule:
+  the cat sat on the mat     order 1: 0.027778    order 2: 0.166667
+  the cat ran to the park    order 1: 0.013889    order 2: 0.166667
+
+A sentence that never occurs in the corpus:
+  the mat sat on the cat     order 1: 0.000000    order 2: 0.000000
+
+Generated sentences written to generated_sentences.txt

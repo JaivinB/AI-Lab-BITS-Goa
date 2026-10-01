@@ -1,0 +1,209 @@
+
+==================================================================
+TASK 3 - TESTING THE GENERATED PROGRAM
+==================================================================
+Test 1: the warehouse supplied in the laboratory sheet
+Expected: a path exists; length must be at least the Manhattan
+distance of 20 between S and G.
+
+------------------------------------------------------------------
+Test 1 - A* on the original warehouse
+------------------------------------------------------------------
+Solution found : yes
+Path length    : 40 moves (cost 40)
+States expanded: 63   (generated 127, peak frontier 3)
+Verification   : all checks passed
+Path           : (1, 1) (1, 2) (1, 3) (1, 4) (1, 5) (2, 5) (3, 5) (4, 5) (5, 5) (5, 6) (5, 7) (5, 8) (5, 9) (5, 10) (5, 11) (5, 12) (5, 13) (4, 13) (3, 13) (3, 12) (3, 11) (3, 10) (3, 9) (3, 8) (3, 7) (2, 7) (1, 7) (1, 8) (1, 9) (1, 10) (1, 11) (1, 12) (1, 13) (1, 14) (1, 15) (2, 15) (3, 15) (4, 15) (5, 15) (6, 15) (7, 15)
+Actions        : Right Right Right Right Down Down Down Down Right Right Right Right Right Right Right Right Up Up Left Left Left Left Left Left Up Up Right Right Right Right Right Right Right Right Down Down Down Down Down Down
+
+#################
+#S****#*********#
+#.###*#*#######*#
+#...#*#*******#*#
+###.#*#######*#*#
+#...#*********#*#
+#.###########.#*#
+#.............#G#
+#################
+
+Test 2: trivial case - the goal is adjacent to the start
+Expected: exactly one move.
+
+------------------------------------------------------------------
+Test 2 - goal adjacent to start
+------------------------------------------------------------------
+Solution found : yes
+Path length    : 1 moves (cost 1)
+States expanded: 1   (generated 1, peak frontier 1)
+Verification   : all checks passed
+Path           : (1, 1) (1, 2)
+Actions        : Right
+
+#####
+#SG##
+#####
+
+  one-step solution: True
+
+Test 3: no solution - the goal is sealed off
+Expected: termination with failure, not an infinite loop.
+
+------------------------------------------------------------------
+Test 3 - unreachable goal
+------------------------------------------------------------------
+Solution found : NO - the goal is unreachable
+States expanded: 9
+
+  reported failure rather than looping: True
+
+Test 4: alternative paths - two routes of different length
+Expected: the four-move route down the left wall, not the
+twenty-two-move route the long way round.
+
+------------------------------------------------------------------
+Test 4 - shortest of two available routes
+------------------------------------------------------------------
+Solution found : yes
+Path length    : 4 moves (cost 4)
+States expanded: 4   (generated 8, peak frontier 2)
+Verification   : all checks passed
+Path           : (1, 1) (2, 1) (3, 1) (4, 1) (5, 1)
+Actions        : Down Down Down Down
+
+###########
+#S........#
+#*#######.#
+#*#######.#
+#*#######.#
+#G........#
+###########
+
+  shortest route returned: True (length 4, alternative is 22)
+
+
+==================================================================
+TASK 5 - A* COMPARED WITH BLIND SEARCH (warehouse unchanged)
+==================================================================
+The warehouse from the laboratory sheet:
+  Measure                   BFS         A* A* + tie-break
+  --------------------------------------------------------
+  Solution found            yes        yes            yes
+  Path length                40         40             40
+  States expanded            63         63             63
+  Peak frontier               3          3              3
+
+  Both find a 40-move path and both expand 63 states - the heuristic
+  bought nothing at all here.  The peak frontier of 3 explains why:
+  the map is almost entirely single-width corridor, so at nearly
+  every step there is only one successor to choose from.  A heuristic
+  can only help by reordering choices, and this map offers almost
+  none.  A* is not better merely because it is better informed; it is
+  better only when there is a decision for the information to inform.
+
+The same two algorithms on an open floor of comparable size, where
+the search does have choices to make:
+
+Open floor, 15 x 6 free cells:
+  Measure                   BFS         A* A* + tie-break
+  --------------------------------------------------------
+  Solution found            yes        yes            yes
+  Path length                19         19             19
+  States expanded            89         89             19
+  Peak frontier               6          6             18
+
+  A* with Manhattan distance still expands 89 states - exactly the
+  same as BFS, and almost the whole floor.  This is not a bug and not
+  a bad heuristic.  On a unit-cost grid every cell on any monotone
+  staircase from S to G has f(n) = g(n) + h(n) = 19, the optimal cost
+  exactly.  Admissibility guarantees A* never expands a state with
+  f > f*, but it says nothing about the states with f = f*, and here
+  almost every free cell is one of them.  A* is therefore free to
+  expand them in any order, and insertion order fans out like BFS.
+
+  Breaking f-ties towards the goal - prefer the smaller h(n) - cuts
+  expansions from 89 to 19, a factor of 4.7, with the same 19-move
+  optimal path.  Optimality is untouched, because no state with
+  f > f* is expanded under either rule.
+
+
+==================================================================
+TASK 6 - INVESTIGATING THE HEURISTIC
+==================================================================
+Why Manhattan distance is appropriate here: the robot moves only
+horizontally and vertically, one cell per move, at cost 1.  Reaching
+the goal therefore requires at least |dx| + |dy| moves, so Manhattan
+distance never overestimates the remaining cost - it is admissible -
+and it is exact on an empty floor.  Obstacles can only make the true
+cost larger, never smaller, so admissibility survives them.
+
+Each row reports expansions under both tie-breaking rules, because on
+a unit-cost grid the tie rule matters as much as the heuristic.
+
+Warehouse from the laboratory sheet:
+  h(n)            solution  length   expanded (fifo/tied)   optimal?
+  --------------------------------------------------------------------
+  manhattan            yes      40                63 / 63        yes
+  zero                 yes      40                63 / 63        yes
+  euclidean            yes      40                63 / 63        yes
+  2x manhattan         yes      40                63 / 63        yes
+
+  Corridors flatten every difference: all four heuristics return the
+  same 40-move path and expand the same 63 states, and tie-breaking
+  changes nothing either.  Even h = 0 - no information at all - costs
+  nothing on this map, because there is essentially one route to
+  find.  No experiment on this warehouse alone could distinguish a
+  good heuristic from a useless one.
+
+Open floor (same four heuristics):
+  h(n)            solution  length   expanded (fifo/tied)   optimal?
+  --------------------------------------------------------------------
+  manhattan            yes      19                89 / 19        yes
+  zero                 yes      19                89 / 89        yes
+  euclidean            yes      19                89 / 71        yes
+  2x manhattan         yes      19                19 / 19        yes
+
+  With room to choose, the heuristics separate - but only once ties
+  are broken towards the goal:
+    h = 0        89 / 89  - degenerates to uniform-cost search; it
+                 carries no information, so it cannot even break a
+                 tie, and the tuned column is identical.
+    Euclidean    89 / 71  - admissible, but on 4-connected moves it
+                 underestimates by more than Manhattan does, so it
+                 is the weaker of the two admissible heuristics.
+    Manhattan    89 / 19  - exact on an open floor; with goal-directed
+                 tie-breaking it expands only the 19 cells of the
+                 path itself.
+    2 x Manhattan 19 / 19 - fewest expansions of all, and it needs no
+                 tie-breaking, because inflating h destroys the ties.
+  The ranking by expansions follows the ranking by how much the
+  heuristic knows - which is the answer to 'what information does the
+  algorithm use to decide where to search next?'
+
+
+==================================================================
+TASK 6 (continued) - WHAT AN INADMISSIBLE HEURISTIC COSTS
+==================================================================
+2 x Manhattan can exceed the true remaining cost, so A* loses its
+optimality guarantee.  On both maps above the returned path stayed
+optimal anyway, which is itself the warning: a broken heuristic can
+look perfectly fine on the maps you happen to test.  On a layout with
+genuinely competing routes it does fail:
+
+Partly open floor with competing routes:
+  h(n)            solution  length   expanded (fifo/tied)   optimal?
+  --------------------------------------------------------------------
+  manhattan            yes      18                55 / 48        yes
+  zero                 yes      18                61 / 61        yes
+  euclidean            yes      18                55 / 46        yes
+  2x manhattan         yes      22                39 / 36    NO (+4)
+
+  2 x Manhattan expands fewest - 39 states against 55 - and returns a
+  22-move path where the optimum is 18.  That is the trade exactly:
+  inflating h buys search effort with solution quality.  Weighted A*
+  with weight w returns a path no worse than w times optimal, and
+  22 <= 2 x 18 respects that bound.  Too optimistic a heuristic
+  (h = 0) is safe but slow; too aggressive a heuristic is fast but
+  can be wrong, and the error is silent - the program still prints a
+  valid path, just not a shortest one.  Only a test that knows the
+  true optimum detects it.
+
